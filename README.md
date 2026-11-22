@@ -56,18 +56,18 @@ python -m http.server 8000
 
 ## 2026-11-22 Codex: 公開とスマホ編集
 
-公開先: https://native-studio-game.github.io/osakanya-lp/
-公開用GitHub: https://github.com/native-studio-game/osakanya-lp
+公開先: https://native-studio-game.github.io/osakanya/
+公開用GitHub: https://github.com/native-studio-game/osakanya
 
 ### スマホから編集する
 
-1. GitHubへログインして https://github.com/native-studio-game/osakanya-lp/edit/main/content.json を開く。
+1. GitHubへログインして https://github.com/native-studio-game/osakanya/edit/main/content.json を開く。
 2. `heroCatch`（見出し）、`purchaseUrl`（購入先）、`characters`（10匹の紹介）の引用符内の文章を直す。括弧・カンマ・引用符は残す。
 3. 「Commit changes」で保存。mainへ反映するとGitHub Pagesが自動で更新する。
 4. 公開ページを再読み込みして確認。反映まで数分かかる場合がある。
 
-本文やデザイン全体: https://github.com/native-studio-game/osakanya-lp/edit/main/index.html
-更新状況: https://github.com/native-studio-game/osakanya-lp/actions
+本文やデザイン全体: https://github.com/native-studio-game/osakanya/edit/main/index.html
+更新状況: https://github.com/native-studio-game/osakanya/actions
 
 公開用リポジトリをWebの正本とする。スマホで編集した後は、先に公開用リポジトリの最新を取得し、このフォルダへ反映してからPCで変更する。古いローカルファイルで上書きしない。
 
