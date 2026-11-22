@@ -259,13 +259,10 @@ section{position:relative;}
 .m-role{display:inline-block;background:rgba(255,107,107,.15);color:var(--coralDark);font-weight:900;
   font-size:12px;padding:4px 14px;border-radius:999px;margin-bottom:6px;}
 .m-name{font-size:28px;font-weight:900;margin:0 0 4px;text-align:center;}
-.m-catch{font-size:15px;font-weight:900;color:var(--seaDeep);text-align:center;margin:0 0 16px;}
 .m-box{background:var(--sandLight);border-radius:16px;padding:16px;border:2px solid var(--sandWarm);text-align:left;}
 .m-box .lbl{font-size:12px;font-weight:900;color:rgba(74,53,37,.6);display:block;}
 .m-box p{margin:2px 0 0;font-size:14px;font-weight:800;line-height:1.6;}
 .m-box .div{border-top:1px solid var(--sandWarm);margin-top:12px;padding-top:12px;}
-.m-box .style{color:var(--seaDeep);font-weight:900;}
-.modal-note{margin:12px 0 0;font-size:11px;font-weight:800;color:rgba(74,53,37,.5);text-align:center;}
 </style>
 </head>
 <body>
@@ -364,7 +361,7 @@ section{position:relative;}
       <div class="feat b2"><div class="ic">🏆</div><span class="no">POINT 02</span>
         <h3>伝説の大物を狙え</h3><p>海に眠る大物を釣り上げれば、一気に逆転のチャンス。最後の1投まで誰が勝つかわからないドキドキ展開！</p></div>
       <div class="feat b3"><div class="ic">🐱</div><span class="no">POINT 03</span>
-        <h3>かわいいねこたち</h3><p>個性ゆたかなねこ漁師が勢ぞろい。お気に入りの推しねこを見つけて、一緒に大海原へ出かけよう！</p></div>
+        <h3>かわいいねこたち</h3><p>釣りを始めたばかりのにゃんたから、伝説の釣りマスター・たつじんまで。個性ゆたかな10匹から、お気に入りのねこを見つけよう！</p></div>
     </div>
     <div class="gallery">
       <h3>📸 プレイ風景 ＆ コンポーネント</h3>
@@ -385,10 +382,10 @@ section{position:relative;}
     <div class="center" style="margin-bottom:22px;">
       <span class="eyebrow" style="background:rgba(255,107,107,.15);color:var(--coralDark);">🐾 CHARACTERS</span>
       <h2 class="sec-title">ねこたち しょうかい</h2>
-      <p class="sec-sub">気になるねこをタップすると、くわしいプロフィールが見られるよ！</p>
+      <p class="sec-sub">釣り好きな島の仲間たち。気になるねこをタップして、性格や暮らしをのぞいてみよう！</p>
     </div>
     <div class="char-grid" id="char-grid"></div>
-    <p class="note">※ キャラクター紹介の文章は仮です（公式設定に合わせて調整できます）</p>
+    
   </div>
 </section>
 
@@ -453,12 +450,12 @@ section{position:relative;}
     <div class="m-avatar" id="m-avatar"><div class="inner"><img id="m-img" src="" alt=""></div></div>
     <span class="m-role" id="m-role"></span>
     <h3 class="m-name" id="m-name"></h3>
-    <p class="m-catch" id="m-catch"></p>
+    
     <div class="m-box">
-      <span class="lbl">🐾 せいかく・特徴</span><p id="m-desc"></p>
-      <div class="div"><span class="lbl">🎣 とくいな釣りスタイル</span><p class="style" id="m-style"></p></div>
+      <span class="lbl">🐾 どんなねこ？</span><p id="m-desc"></p>
+      
     </div>
-    <p class="modal-note">※キャラクター画像・プロフィール文は公式設定に合わせて変更できます</p>
+    
   </div>
 </div>
 
@@ -480,7 +477,7 @@ CATS.forEach(c=>{
   const b=document.createElement('button');
   b.type='button';b.className='char-card';b.setAttribute('aria-label',c.name+'のプロフィールを見る');
   b.innerHTML='<div class="ring" style="background:'+c.ring+'"><div class="inner"><img src="'+c.img+'" alt="'+c.name+'"></div></div>'+
-    '<h3>'+c.name+'</h3><p class="cp">'+c.catch+'</p><span class="more">くわしく見る ＋</span>';
+    '<h3>'+c.name+'</h3><p class="cp">'+c.role+'</p><span class="more">くわしく見る ＋</span>';
   b.addEventListener('click',()=>openModal(c));
   grid.appendChild(b);
 });
@@ -495,9 +492,7 @@ function openModal(c){
   const im=document.getElementById('m-img');im.src=c.img;im.alt=c.name;
   document.getElementById('m-role').textContent='🐾 '+c.role;
   document.getElementById('m-name').textContent=c.name;
-  document.getElementById('m-catch').textContent='「'+c.catch+'」';
   document.getElementById('m-desc').textContent=c.desc;
-  document.getElementById('m-style').textContent=c.style;
   modal.classList.add('open');document.body.style.overflow='hidden';
 }
 function closeModal(){modal.classList.remove('open');document.body.style.overflow='';}
