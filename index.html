@@ -147,25 +147,25 @@ section{position:relative;}
 
 /* ===== FEATURES ===== */
 .features{padding:72px 0;background:linear-gradient(180deg,#E8F9FF,#D6F4FF 50%,#E8F9FF);}
-.feat-grid{display:grid;grid-template-columns:1fr;gap:24px;margin:44px 0;}
-@media(min-width:768px){.feat-grid{grid-template-columns:repeat(3,1fr);}}
-.feat{background:#fff;border-radius:28px;padding:30px 26px;text-align:center;
+.feat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(8px,2.2vw,24px);margin:44px 0;}
+
+.feat{background:#fff;border-radius:clamp(14px,3vw,28px);padding:clamp(14px,3vw,30px) clamp(7px,2.4vw,26px);min-width:0;text-align:center;
   box-shadow:0 10px 25px -5px rgba(11,132,184,.16);transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
 .feat:hover{transform:translateY(-8px);}
 .feat.b1{border-bottom:8px solid var(--seaLight);}
 .feat.b2{border-bottom:8px solid var(--sunny);}
 .feat.b3{border-bottom:8px solid var(--coral);}
-.feat .ic{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+.feat .ic{width:clamp(44px,8vw,80px);height:clamp(44px,8vw,80px);border-radius:50%;display:flex;align-items:center;justify-content:center;
   font-size:38px;margin:0 auto 16px;box-shadow:inset 0 2px 6px rgba(0,0,0,.08);}
 .feat.b1 .ic{background:rgba(185,243,255,.6);}
 .feat.b2 .ic{background:rgba(255,212,59,.3);}
 .feat.b3 .ic{background:rgba(255,107,107,.15);}
-.feat .no{display:inline-block;font-size:12px;font-weight:900;padding:4px 12px;border-radius:999px;margin-bottom:10px;}
+.feat .no{display:inline-block;white-space:nowrap;font-size:clamp(9px,1.4vw,12px);font-weight:900;padding:4px clamp(4px,1.2vw,12px);border-radius:999px;margin-bottom:10px;}
 .feat.b1 .no{color:var(--seaDeep);background:rgba(185,243,255,.5);}
 .feat.b2 .no{color:#a16207;background:rgba(255,212,59,.4);}
 .feat.b3 .no{color:var(--coralDark);background:rgba(255,107,107,.15);}
-.feat h3{font-size:20px;font-weight:900;margin:0 0 12px;}
-.feat p{font-size:15px;font-weight:800;line-height:1.7;color:rgba(74,53,37,.82);margin:0;}
+.feat h3{font-size:clamp(13px,2.3vw,20px);font-weight:900;margin:0 0 12px;}
+.feat p{font-size:clamp(11px,1.7vw,15px);font-weight:800;line-height:1.7;color:rgba(74,53,37,.82);margin:0;}
 .gallery{background:rgba(255,255,255,.9);border-radius:32px;padding:30px;border:2px solid #fff;
   box-shadow:0 10px 25px -5px rgba(11,132,184,.16);}
 .gallery h3{text-align:center;font-size:clamp(18px,3vw,24px);font-weight:900;margin:0 0 22px;}
