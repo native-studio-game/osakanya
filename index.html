@@ -231,11 +231,13 @@ section{position:relative;}
 .cta .big-emoji{font-size:clamp(40px,8vw,52px);margin-bottom:12px;}
 .cta h2{font-size:clamp(24px,5vw,40px);font-weight:900;line-height:1.3;margin:0 0 16px;}
 .cta p{font-size:15px;font-weight:800;color:rgba(255,255,255,.9);margin:0 0 30px;}
-.fish-ring{display:grid;grid-template-columns:repeat(5,1fr);align-items:center;justify-items:center;
-  gap:10px 2px;max-width:520px;margin:0 auto 20px;}
-.fish-ring img{width:clamp(34px,7vw,56px);height:auto;filter:drop-shadow(0 4px 6px rgba(0,0,0,.15));}
-.fish-ring img.big-fish{width:clamp(48px,10vw,78px);}
-.fish-ring h2{grid-column:1/-1;margin:6px 0;}
+.fish-ring{position:relative;max-width:460px;margin:0 auto 20px;
+  padding:clamp(60px,15vw,100px) clamp(40px,11vw,80px);}
+.fish-ring h2{position:relative;z-index:2;margin:0;}
+.fish-ring img{position:absolute;z-index:1;width:clamp(50px,12vw,96px);height:clamp(50px,12vw,96px);
+  object-fit:contain;filter:drop-shadow(0 4px 8px rgba(0,0,0,.2));}
+.fish-ring img.big-fish{width:clamp(74px,18vw,138px);height:clamp(74px,18vw,138px);}
+.cta-note{margin:14px 0 0;font-size:13px;font-weight:800;color:rgba(255,255,255,.85);}
 .footer{margin-top:60px;padding-top:26px;border-top:1px solid rgba(255,255,255,.2);
   font-size:13px;font-weight:800;color:rgba(255,255,255,.85);}
 .footer a{text-decoration:underline;}
@@ -442,21 +444,21 @@ section{position:relative;}
   <div class="bubble" style="width:12px;height:12px;left:45%;bottom:30px;--dur:5.5s;--delay:2s"></div>
   <div class="wrap" style="max-width:640px;position:relative;z-index:10;">
     <div class="fish-ring">
-      <img class="animate-float" src="assets/fish/tai.png" alt="タイ" style="transform:rotate(4deg);animation-delay:.2s;">
-      <img class="animate-floatRev" src="assets/fish/same.png" alt="サメ" style="transform:rotate(-3deg);animation-delay:.8s;">
-      <img class="animate-float" src="assets/fish/fugu.png" alt="フグ" style="transform:rotate(5deg);animation-delay:1.3s;">
-      <img class="animate-floatRev" src="assets/fish/tako.png" alt="タコ" style="transform:rotate(-2deg);animation-delay:.5s;">
-      <img class="animate-float" src="assets/fish/kani.png" alt="カニ" style="transform:rotate(3deg);animation-delay:1.0s;">
-      <h2>個性ゆたかな<br>お魚たちが<br>あなたを待っている！</h2>
-      <img class="animate-floatRev" src="assets/fish/ika.png" alt="イカ" style="transform:rotate(-4deg);animation-delay:.9s;">
-      <img class="animate-float" src="assets/fish/ebi.png" alt="エビ" style="transform:rotate(4deg);animation-delay:1.6s;">
-      <img class="animate-floatRev" src="assets/fish/hirame.png" alt="ヒラメ" style="transform:rotate(-3deg);animation-delay:.4s;">
-      <img class="animate-float" src="assets/fish/aji.png" alt="アジ" style="transform:rotate(3deg);animation-delay:1.2s;">
-      <img class="animate-floatRev big-fish" src="assets/fish/maguro.png" alt="マグロ" style="transform:rotate(-6deg);animation-delay:.1s;">
+      <img class="animate-float" src="assets/fish/tai.png" alt="タイ" style="top:-8%;left:4%;transform:rotate(4deg);animation-delay:.2s;">
+      <img class="animate-floatRev" src="assets/fish/same.png" alt="サメ" style="top:-14%;left:50%;transform:translateX(-50%) rotate(-3deg);animation-delay:.8s;">
+      <img class="animate-float" src="assets/fish/fugu.png" alt="フグ" style="top:-8%;right:4%;transform:rotate(5deg);animation-delay:1.3s;">
+      <img class="animate-floatRev" src="assets/fish/tako.png" alt="タコ" style="top:32%;left:-10%;transform:rotate(-2deg);animation-delay:.5s;">
+      <img class="animate-float" src="assets/fish/kani.png" alt="カニ" style="top:32%;right:-10%;transform:rotate(3deg);animation-delay:1.0s;">
+      <h2>個性豊かな<br>お魚たちが<br>あなたを待っている！</h2>
+      <img class="animate-floatRev" src="assets/fish/ika.png" alt="イカ" style="bottom:26%;left:-14%;transform:rotate(-4deg);animation-delay:.9s;">
+      <img class="animate-float" src="assets/fish/ebi.png" alt="エビ" style="bottom:-12%;left:8%;transform:rotate(4deg);animation-delay:1.6s;">
+      <img class="animate-floatRev" src="assets/fish/hirame.png" alt="ヒラメ" style="bottom:-16%;left:50%;transform:translateX(-50%) rotate(-3deg);animation-delay:.4s;">
+      <img class="animate-float" src="assets/fish/aji.png" alt="アジ" style="bottom:26%;right:-14%;transform:rotate(3deg);animation-delay:1.2s;">
+      <img class="animate-floatRev big-fish" src="assets/fish/maguro.png" alt="マグロ" style="bottom:-16%;right:2%;transform:rotate(-6deg);animation-delay:.1s;">
     </div>
-    <p>個性ゆたかなお魚たちとの出会いは、『おさかにゃ』の中で。Native Studio 公式オンラインストアにてお買い求めいただけます。</p>
     <a class="btn btn-lg" href="https://native-studio.square.site/" target="_blank" rel="noopener">
       オンラインストアで購入する <span class="arrow">▶</span></a>
+    <p class="cta-note">※ Native Studio 公式Squareオンラインストアへ移動します</p>
     <footer class="footer">© Native Studio ｜ <a href="https://native-studio.square.site/" target="_blank" rel="noopener">オンラインストア</a></footer>
   </div>
 </section>
