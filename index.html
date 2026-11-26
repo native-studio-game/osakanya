@@ -152,7 +152,9 @@ section{position:relative;}
 .story-card .c-br{bottom:-22px;right:-10px;}
 .story-card p{font-size:17px;line-height:2;font-weight:800;margin:0 0 18px;text-align:center;}
 .story-card p:last-child{margin-bottom:0;}
-@media(min-width:640px){.story-card p{text-align:left;}.story-card p.mid{text-align:center;}}
+.story-card p.title{font-style:italic;font-weight:700;font-size:15px;letter-spacing:.1em;
+  color:var(--seaDeep);opacity:.75;margin-bottom:22px;}
+@media(min-width:640px){.story-card p{text-align:left;}.story-card p.mid,.story-card p.title{text-align:center;}}
 .mark{background:rgba(255,212,59,.6);padding:1px 8px;border-radius:8px;font-weight:900;}
 .big-coral{color:var(--coralDark);font-weight:900;font-size:20px;}
 .ul-sea{color:var(--seaDeep);font-weight:900;text-decoration:underline;text-decoration-color:var(--sunny);
@@ -372,11 +374,12 @@ section{position:relative;}
     <div class="story-card">
       <span class="corner c-tl animate-wiggle">🏝️</span>
       <span class="corner c-br animate-float">🐟</span>
-      <p>ここは、海にぽっかり浮かぶ小さな島。<br>しおの香りにさそわれて、海にはねこたちが集まります。</p>
-      <p>目指すは、まだ誰も出会ったことのない、とびきり大きなお魚。<br>「1番の<span class="mark">おさかにゃ釣り</span>は誰か決めるにゃ」<br>そのひと言から、ねこたちのにぎやかな釣り勝負がはじまりました。</p>
-      <p>1匹のねことなったあなたはこの勝負に参加します。<br>最初は少しのエサしか持っていないため、小さな魚しか釣れません。</p>
-      <p>しかし、仲間のねこを集めたり、道具を仕入れたり、時には釣った魚をエサにすることで、ぐんぐん釣りのレベルを上げていくことができるでしょう。</p>
-      <p class="mid" style="font-size:19px;font-weight:900;">そして最終的には<span class="ul-sea">伝説の大物</span>を釣り上げ、<br>島いちばんのねこ漁師を目指しましょう！</p>
+      <p class="title">ー ここは海にぽっかり浮かぶ小さな島 ー</p>
+      <p>しおの香りにさそわれて、今日も海にはねこたちが集まります。</p>
+      <p>目指すは、まだ誰も出会ったことのない、とびきり大きなお魚。</p>
+      <p>「1番の<span class="mark">おさかにゃ釣り</span>は誰か決めるにゃ」</p>
+      <p>そのひと言から、ねこたちのにぎやかな釣り勝負がはじまりました。</p>
+      <p class="mid" style="font-size:19px;font-weight:900;">1匹のねことなったあなたも、この勝負に参加しませんか？ 🐱</p>
     </div>
   </div>
 </section>
