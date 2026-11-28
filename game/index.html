@@ -195,7 +195,7 @@
   // letterbox (black bars) the rest, so the game plays identically on
   // the signage and on a laptop while debugging.
   const stageEl = document.getElementById('stage');
-  const ASPECT = 16/9;
+  const ASPECT = 9/16; // signage is a 16:9 panel mounted in portrait, so width:height is 9:16
   function resize(){
     const ww = window.innerWidth, wh = window.innerHeight;
     let w, h;
