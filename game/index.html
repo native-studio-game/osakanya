@@ -36,11 +36,16 @@
   }
   .overlay{
     position:absolute; inset:0; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; text-align:center;
+    align-items:center; justify-content:flex-start; text-align:center;
     background:rgba(5,30,50,0.55);
     backdrop-filter:blur(2px);
     z-index:10;
+    overflow-y:auto;
+    padding:28px 16px;
   }
+  /* pushes content toward vertical center when it fits, without ever
+     clipping/hiding content it doesn't (narrow portrait screens) */
+  .overlay::before, .overlay::after{ content:""; flex:1 0 0; min-height:0; }
   .hidden{display:none !important;}
   .overlay h1{
     font-size:clamp(28px,6vw,56px);
