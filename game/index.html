@@ -283,15 +283,20 @@
   }
 
   // ---------- players ----------
-  function newPlayer(color, standX){
+  // The whole rig (angler + rod + line) sits at a single x; moving left/right
+  // shifts the whole thing together, it isn't just the lure sliding on its
+  // own. depth is 0 at the player and animates out during a cast.
+  const CAST_FLIGHT_TIME = 0.22; // seconds for the "fwip" out to the target depth
+  function newPlayer(color, homeX){
     return {
       color: color,
-      standX: standX,   // fixed position the angler stands at (near edge)
-      aimX: standX,      // where the line is currently aimed (0..1)
-      depth: 0,          // 0 = reeled all the way in
-      state: 'aim',      // 'aim' | 'out' | 'reeling'
+      homeX: homeX,      // where this player resets to
+      x: homeX,          // current rig position (0..1)
+      depth: 0,          // 0 = at the player; >0 = out in the pond
+      state: 'aim',      // 'aim' | 'casting' | 'out' | 'reeling'
       isCharging: false,
       charge: 0,
+      castFrom: 0, castTo: 0, castTimer: 0,
       hookedFish: null,
       prevHeld: false,
       score: 0,
@@ -306,8 +311,9 @@
   const P2 = newPlayer(getComputedStyleVar('--p2'), 0.72);
 
   function resetPlayer(p){
-    p.aimX = p.standX; p.depth = 0; p.state = 'aim';
+    p.x = p.homeX; p.depth = 0; p.state = 'aim';
     p.isCharging = false; p.charge = 0; p.hookedFish = null;
+    p.castFrom = 0; p.castTo = 0; p.castTimer = 0;
     p.score = 0; p.got = {}; p.pulse = 0;
   }
 
@@ -387,24 +393,34 @@
     if(p.pulse > 0) p.pulse -= dt*3;
 
     if(p.state === 'aim'){
+      // moving shifts the whole rig (rod + angler), not just the lure end
       let dx = axisX;
       if(label === 'P1'){ if(keys['KeyA']) dx -= 1; if(keys['KeyD']) dx += 1; }
       else { if(keys['ArrowLeft']) dx -= 1; if(keys['ArrowRight']) dx += 1; }
       dx = Math.max(-1, Math.min(1, dx));
-      p.aimX = Math.max(0.04, Math.min(0.96, p.aimX + dx*AIM_SPEED*dt));
+      p.x = Math.max(0.04, Math.min(0.96, p.x + dx*AIM_SPEED*dt));
 
       if(held && !p.prevHeld){ p.isCharging = true; p.charge = 0; }
       if(p.isCharging){
+        // depth stays put at 0 while charging (no sliding preview) - it
+        // only moves the instant you let go, like a real cast
         if(held){
           p.charge = Math.min(1, p.charge + dt/CHARGE_TIME);
         } else {
-          // released: cast!
-          p.depth = chargeToDepth(p.charge);
-          p.state = 'out';
+          p.castFrom = 0;
+          p.castTo = chargeToDepth(p.charge);
+          p.castTimer = 0;
+          p.state = 'casting';
           p.isCharging = false;
           p.charge = 0;
         }
       }
+    } else if(p.state === 'casting'){
+      p.castTimer += dt;
+      const t = Math.min(1, p.castTimer / CAST_FLIGHT_TIME);
+      const eased = 1 - (1-t)*(1-t); // ease-out: fast start, settles in
+      p.depth = p.castFrom + (p.castTo - p.castFrom) * eased;
+      if(t >= 1){ p.depth = p.castTo; p.state = 'out'; }
     } else if(p.state === 'out'){
       if(held && !p.prevHeld){ p.state = 'reeling'; }
     } else if(p.state === 'reeling'){
@@ -415,7 +431,7 @@
           let best = null, bestD = Infinity;
           for(const f of fishes){
             if(f.hooked || f.caught > 0) continue;
-            const dxp = Math.abs(f.x - p.aimX), ddp = Math.abs(f.depth - p.depth);
+            const dxp = Math.abs(f.x - p.x), ddp = Math.abs(f.depth - p.depth);
             if(dxp < HOOK_X_TOL && ddp < HOOK_DEPTH_TOL){
               const d = dxp + ddp;
               if(d < bestD){ bestD = d; best = f; }
@@ -424,7 +440,7 @@
           if(best){ best.hooked = true; p.hookedFish = best; p.pulse = 1; }
         }
         p.depth = Math.max(0, p.depth - REEL_SPEED*dt);
-        if(p.hookedFish){ p.hookedFish.x = p.aimX; p.hookedFish.depth = p.depth; }
+        if(p.hookedFish){ p.hookedFish.x = p.x; p.hookedFish.depth = p.depth; }
         if(p.depth <= 0){
           finishReel(p, label);
         }
@@ -484,6 +500,7 @@
   }
   const STATE_LABEL = {
     aim: 'ねらいを決めてボタン長押し',
+    casting: '投げた！',
     out: 'もう一度ボタンでリール！',
     reeling: 'リール中…はなすと一時停止'
   };
@@ -565,11 +582,11 @@
     }
   }
 
-  // line from the angler's stand point to the current lure position
+  // line from the angler straight out to the current lure depth - always
+  // the same x as the angler, since the whole rig moves together
   function drawLine(p){
-    const from = project(p.standX, 0);
-    const lureDepth = p.state === 'aim' ? (p.isCharging ? chargeToDepth(p.charge) : 0) : p.depth;
-    const to = project(p.aimX, lureDepth);
+    const from = project(p.x, 0);
+    const to = project(p.x, p.depth);
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     ctx.lineWidth = 2;
@@ -586,7 +603,7 @@
   // we don't control the font setup of.
   function drawRig(p){
     // angler's stand icon at the near edge
-    const stand = project(p.standX, 0);
+    const stand = project(p.x, 0);
     ctx.save();
     ctx.translate(stand.x, stand.y);
     ctx.beginPath();
@@ -601,8 +618,7 @@
     ctx.restore();
 
     // lure / hook marker
-    const lureDepth = p.state === 'aim' ? (p.isCharging ? chargeToDepth(p.charge) : 0) : p.depth;
-    const proj = project(p.aimX, lureDepth);
+    const proj = project(p.x, p.depth);
     const pulse = 1 + p.pulse*0.6;
     ctx.save();
     ctx.translate(proj.x, proj.y);
