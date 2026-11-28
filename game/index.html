@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>おさかにゃ釣りバトル！</title>
+<style>
+  :root{
+    --seaDeep:#0b3d5c;
+    --seaMid:#1565a0;
+    --seaLight:#5bc0eb;
+    --sand:#ffe9b3;
+    --p1:#3399ff;
+    --p2:#ff5c5c;
+    --gold:#ffd43b;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background:#000;
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif;
+    color:#fff;
+    touch-action:none;
+    user-select:none;
+  }
+  /* #stage is kept at a fixed 16:9 aspect ratio and centered (letterboxed)
+     regardless of the actual screen/window size, since this targets a
+     16:9 signage display. Size/position is computed in JS (fitStage). */
+  #stage{
+    position:absolute; top:0; left:0;
+    background:linear-gradient(180deg,#8fe0ff 0%, var(--seaLight) 30%, var(--seaMid) 70%, var(--seaDeep) 100%);
+    overflow:hidden;
+  }
+  canvas{
+    position:absolute; top:0; left:0; width:100%; height:100%; display:block;
+  }
+  .overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    background:rgba(5,30,50,0.55);
+    backdrop-filter:blur(2px);
+    z-index:10;
+  }
+  .hidden{display:none !important;}
+  .overlay h1{
+    font-size:clamp(28px,6vw,56px);
+    margin:0 0 .2em;
+    text-shadow:0 3px 0 rgba(0,0,0,.25);
+  }
+  .overlay p{ font-size:clamp(14px,2.4vw,20px); line-height:1.8; margin:.4em 0; }
+  .players-howto{
+    display:flex; gap:28px; margin:18px 0 26px; flex-wrap:wrap; justify-content:center;
+  }
+  .how-card{
+    background:rgba(255,255,255,.12); border-radius:16px; padding:14px 20px;
+    border:2px solid rgba(255,255,255,.35); min-width:200px;
+  }
+  .how-card.p1{ border-color:var(--p1); }
+  .how-card.p2{ border-color:var(--p2); }
+  .how-card b{ font-size:18px; }
+  button.bigbtn{
+    font-size:clamp(18px,3vw,26px);
+    padding:.7em 2em;
+    border-radius:999px;
+    border:none;
+    background:linear-gradient(180deg,#ffe066,var(--gold));
+    color:#5c3d00;
+    font-weight:900;
+    cursor:pointer;
+    box-shadow:0 6px 0 #c99a00, 0 10px 18px rgba(0,0,0,.3);
+    transition:transform .08s;
+  }
+  button.bigbtn:active{ transform:translateY(4px); box-shadow:0 2px 0 #c99a00; }
+  #hud{
+    position:absolute; top:0; left:0; width:100%; padding:14px 18px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    z-index:5; pointer-events:none;
+  }
+  .score-box{
+    display:flex; align-items:center; gap:10px;
+    background:rgba(0,0,0,.35); border-radius:14px; padding:8px 16px;
+    border:3px solid transparent;
+  }
+  .score-box.p1{ border-color:var(--p1); }
+  .score-box.p2{ border-color:var(--p2); }
+  .score-box .label{ font-size:14px; opacity:.85; }
+  .score-box .num{ font-size:clamp(22px,4vw,34px); font-weight:900; min-width:1.6em; text-align:right; }
+  .letters{
+    display:flex; gap:4px; margin-top:2px;
+  }
+  .letters span{
+    width:22px; height:22px; border-radius:6px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700;
+    background:rgba(255,255,255,.15);
+    color:rgba(255,255,255,.4);
+  }
+  .letters span.got{ background:var(--gold); color:#5c3d00; }
+  #timerWrap{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    text-align:center; z-index:5; pointer-events:none;
+  }
+  #timerNum{ font-size:clamp(28px,5vw,46px); font-weight:900; text-shadow:0 3px 0 rgba(0,0,0,.3); }
+  #timerBarBg{
+    width:min(70vw,460px); height:10px; background:rgba(0,0,0,.35); border-radius:6px; overflow:hidden; margin-top:4px;
+  }
+  #timerBarFill{
+    height:100%; width:100%; background:linear-gradient(90deg,#51cf66,#ffd43b,#ff5c5c); transition:width .2s linear;
+  }
+  #toast{
+    position:absolute; top:46%; left:50%; transform:translate(-50%,-50%) scale(0);
+    font-size:clamp(20px,4vw,32px); font-weight:900; color:var(--gold);
+    text-shadow:0 2px 0 rgba(0,0,0,.4); z-index:6; pointer-events:none;
+    transition:transform .15s ease-out, opacity .4s ease-in;
+    opacity:0;
+  }
+  #toast.show{ transform:translate(-50%,-50%) scale(1); opacity:1; }
+  .result-row{
+    font-size:clamp(20px,4vw,30px); margin:6px 0; font-weight:700;
+  }
+  .result-row.winner{ color:var(--gold); font-size:clamp(26px,5vw,40px); }
+  small.note{ opacity:.75; font-size:12px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="score-box p1">
+      <div>
+        <div class="label">PLAYER 1</div>
+        <div class="num" id="score1">0</div>
+        <div class="letters" id="letters1"></div>
+      </div>
+    </div>
+    <div class="score-box p2">
+      <div>
+        <div class="label">PLAYER 2</div>
+        <div class="num" id="score2">0</div>
+        <div class="letters" id="letters2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="timerWrap" class="hidden">
+    <div id="timerNum">60</div>
+    <div id="timerBarBg"><div id="timerBarFill"></div></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="overlay" id="titleScreen">
+    <h1>🐱 おさかにゃ釣りバトル！ 🐟</h1>
+    <p>ふたりで同時に釣り竿をあやつって、たくさん釣ろう！<br>
+    自分の文字が「<b>おさかにゃ</b>」ぜんぶ揃うと、ボーナス15点！</p>
+    <div class="players-howto">
+      <div class="how-card p1">
+        <b style="color:var(--p1)">PLAYER 1</b><br>
+        コントローラー：左スティックで移動／いずれかのボタンでキャッチ<br>
+        <small class="note">キーボード：WASD + スペース</small>
+      </div>
+      <div class="how-card p2">
+        <b style="color:var(--p2)">PLAYER 2</b><br>
+        コントローラー：左スティックで移動／いずれかのボタンでキャッチ<br>
+        <small class="note">キーボード：矢印キー + Enter</small>
+      </div>
+    </div>
+    <button class="bigbtn" id="startBtn">スタート！</button>
+    <p><small class="note" id="gpStatus">コントローラーが見つかりません（ボタンを一度押すと認識します）</small></p>
+  </div>
+
+  <div class="overlay hidden" id="countdownScreen">
+    <h1 id="countdownNum">3</h1>
+  </div>
+
+  <div class="overlay hidden" id="resultScreen">
+    <h1>タイムアップ！</h1>
+    <div class="result-row" id="resultWinner"></div>
+    <div class="result-row">🔵 PLAYER 1：<span id="finalScore1">0</span>点</div>
+    <div class="result-row">🔴 PLAYER 2：<span id="finalScore2">0</span>点</div>
+    <button class="bigbtn" id="retryBtn">もういちどあそぶ</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- setup ----------
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  // Signage target is a fixed 16:9 screen. We fit the largest possible
+  // 16:9 box into whatever window/screen we're actually shown on, and
+  // letterbox (black bars) the rest, so the game plays identically on
+  // the signage and on a laptop while debugging.
+  const stageEl = document.getElementById('stage');
+  const ASPECT = 16/9;
+  function resize(){
+    const ww = window.innerWidth, wh = window.innerHeight;
+    let w, h;
+    if(ww / wh > ASPECT){
+      h = wh; w = h * ASPECT;
+    } else {
+      w = ww; h = w / ASPECT;
+    }
+    stageEl.style.width = w + 'px';
+    stageEl.style.height = h + 'px';
+    stageEl.style.left = ((ww - w)/2) + 'px';
+    stageEl.style.top = ((wh - h)/2) + 'px';
+    canvas.width = Math.round(w);
+    canvas.height = Math.round(h);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const FISH_FILES = ["aji","ebi","fugu","hirame","ika","kani","maguro","same","tai","tako"];
+  const FISH_SRC = {};
+  FISH_FILES.forEach(f => {
+    const img = new Image();
+    img.src = "../assets/fish/" + f + ".png";
+    FISH_SRC[f] = img;
+  });
+
+  const WORD = ["お","さ","か","に","ゃ"]; // おさかにゃ
+  const LETTER_POOL = []; // weighted, lots of duplicates for comeback room
+  WORD.forEach(ch => { for(let i=0;i<6;i++) LETTER_POOL.push(ch); });
+
+  const GAME_SECONDS = 60;
+  const CATCH_RADIUS = 46;
+  const MAX_FISH = 9;
+
+  // ---------- players ----------
+  function newPlayer(color){
+    return {
+      color: color,
+      x: 0, y: 0,
+      score: 0,
+      got: {}, // letter -> true
+      catchCooldown: 0,
+      pulse: 0
+    };
+  }
+  const P1 = newPlayer(getComputedStyleVar('--p1'));
+  const P2 = newPlayer(getComputedStyleVar('--p2'));
+  function getComputedStyleVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#fff';
+  }
+
+  function resetPlayer(p){
+    p.score = 0; p.got = {}; p.catchCooldown = 0; p.pulse = 0;
+  }
+
+  // ---------- fish ----------
+  let fishes = [];
+  let fishId = 0;
+  function spawnFish(){
+    const type = FISH_FILES[Math.floor(Math.random()*FISH_FILES.length)];
+    const letter = LETTER_POOL[Math.floor(Math.random()*LETTER_POOL.length)];
+    const r = 30 + Math.random()*16;
+    fishes.push({
+      id: fishId++,
+      type, letter,
+      x: r + Math.random()*(canvas.width - r*2),
+      y: r + Math.random()*(canvas.height*0.7 - r*2) + canvas.height*0.15,
+      r,
+      vx: (Math.random()*2-1) * 40,
+      vy: (Math.random()*2-1) * 20,
+      bob: Math.random()*Math.PI*2,
+      caught: 0 // scale anim on catch
+    });
+  }
+
+  function updateFish(dt){
+    for(const f of fishes){
+      if(f.caught > 0){ f.caught += dt*4; continue; }
+      f.bob += dt*2;
+      f.x += f.vx*dt;
+      f.y += f.vy*dt + Math.sin(f.bob)*6*dt;
+      if(f.x < f.r || f.x > canvas.width - f.r) f.vx *= -1;
+      const topBound = canvas.height*0.15, botBound = canvas.height*0.85;
+      if(f.y < topBound || f.y > botBound) f.vy *= -1;
+      f.x = Math.max(f.r, Math.min(canvas.width-f.r, f.x));
+      f.y = Math.max(topBound, Math.min(botBound, f.y));
+    }
+    fishes = fishes.filter(f => f.caught < 1);
+    while(fishes.length < MAX_FISH) spawnFish();
+  }
+
+  // ---------- input: gamepad + keyboard ----------
+  const keys = {};
+  window.addEventListener('keydown', e => keys[e.code] = true);
+  window.addEventListener('keyup', e => keys[e.code] = false);
+
+  function readStick(gp, idxX, idxY){
+    if(!gp) return {x:0,y:0};
+    let x = gp.axes[idxX] || 0;
+    let y = gp.axes[idxY] || 0;
+    if(Math.abs(x) < 0.15) x = 0;
+    if(Math.abs(y) < 0.15) y = 0;
+    return {x, y};
+  }
+  function anyButtonPressed(gp){
+    if(!gp) return false;
+    return gp.buttons.some(b => b.pressed || b.value > 0.5);
+  }
+
+  let gpStatusShown = false;
+  function pollGamepads(){
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const list = [];
+    for(const p of pads){ if(p) list.push(p); }
+    if(list.length > 0 && !gpStatusShown){
+      document.getElementById('gpStatus').textContent =
+        "コントローラー " + list.length + "台 検出中！";
+      gpStatusShown = true;
+    }
+    return list;
+  }
+  window.addEventListener('gamepadconnected', () => {
+    document.getElementById('gpStatus').textContent = "コントローラーを検出しました！";
+    gpStatusShown = true;
+  });
+
+  const SPEED = 420; // px/sec at full stick
+
+  function updatePlayerMovement(p, dt, stick, kbUp, kbDown, kbLeft, kbRight){
+    let dx = stick.x, dy = stick.y;
+    if(keys[kbLeft]) dx -= 1;
+    if(keys[kbRight]) dx += 1;
+    if(keys[kbUp]) dy -= 1;
+    if(keys[kbDown]) dy += 1;
+    dx = Math.max(-1, Math.min(1, dx));
+    dy = Math.max(-1, Math.min(1, dy));
+    p.x += dx * SPEED * dt;
+    p.y += dy * SPEED * dt;
+    p.x = Math.max(20, Math.min(canvas.width-20, p.x));
+    p.y = Math.max(20, Math.min(canvas.height-20, p.y));
+    if(p.catchCooldown > 0) p.catchCooldown -= dt;
+    if(p.pulse > 0) p.pulse -= dt*3;
+  }
+
+  function tryCatch(p, label){
+    if(p.catchCooldown > 0) return;
+    let best = null, bestDist = Infinity;
+    for(const f of fishes){
+      if(f.caught > 0) continue;
+      const d = Math.hypot(f.x - p.x, f.y - p.y);
+      if(d < CATCH_RADIUS + f.r*0.5 && d < bestDist){
+        best = f; bestDist = d;
+      }
+    }
+    if(best){
+      best.caught = 0.01;
+      p.score += 3;
+      p.catchCooldown = 0.35;
+      p.pulse = 1;
+      if(WORD.includes(best.letter)) p.got[best.letter] = true;
+      const complete = WORD.every(ch => p.got[ch]);
+      if(complete){
+        p.score += 15;
+        p.got = {};
+        showToast((label==='P1'?'🔵':'🔴') + " おさかにゃ達成！ +15", label);
+      }
+      updateHud();
+    }
+  }
+
+  function showToast(text, who){
+    const el = document.getElementById('toast');
+    el.textContent = text;
+    el.style.color = who === 'P1' ? 'var(--p1)' : (who==='P2' ? 'var(--p2)' : 'var(--gold)');
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=> el.classList.remove('show'), 1100);
+  }
+
+  // ---------- HUD ----------
+  function updateHud(){
+    document.getElementById('score1').textContent = P1.score;
+    document.getElementById('score2').textContent = P2.score;
+    renderLetters('letters1', P1.got);
+    renderLetters('letters2', P2.got);
+  }
+  function renderLetters(elId, got){
+    const el = document.getElementById(elId);
+    el.innerHTML = '';
+    WORD.forEach(ch => {
+      const s = document.createElement('span');
+      s.textContent = ch;
+      if(got[ch]) s.classList.add('got');
+      el.appendChild(s);
+    });
+  }
+
+  // ---------- render ----------
+  function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // sea floor decoration band
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(0, canvas.height*0.85, canvas.width, canvas.height*0.15);
+
+    // fish
+    for(const f of fishes){
+      ctx.save();
+      const scale = f.caught > 0 ? Math.max(0, 1 - f.caught) : 1;
+      ctx.translate(f.x, f.y);
+      ctx.scale(scale * (f.vx < 0 ? -1 : 1), scale);
+      const img = FISH_SRC[f.type];
+      const size = f.r*2.4;
+      if(img.complete && img.naturalWidth){
+        ctx.drawImage(img, -size/2, -size/2, size, size);
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(0,0,f.r,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+
+      if(f.caught <= 0){
+        // letter badge
+        ctx.save();
+        ctx.translate(f.x, f.y - f.r - 10);
+        ctx.beginPath();
+        ctx.arc(0,0,14,0,Math.PI*2);
+        ctx.fillStyle = 'rgba(255,255,255,0.92)';
+        ctx.fill();
+        ctx.fillStyle = '#5c3d00';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(f.letter, 0, 1);
+        ctx.restore();
+      }
+    }
+
+    // cursors
+    drawCursor(P1, '🔵');
+    drawCursor(P2, '🔴');
+  }
+
+  function drawCursor(p, emoji){
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    const pulse = 1 + p.pulse*0.5;
+    ctx.beginPath();
+    ctx.arc(0,0, CATCH_RADIUS*0.55*pulse, 0, Math.PI*2);
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.font = '30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🎣', 0, 0);
+    ctx.restore();
+  }
+
+  // ---------- game loop / state ----------
+  let state = 'title'; // title -> countdown -> playing -> result
+  let timeLeft = GAME_SECONDS;
+  let lastTs = null;
+  let countdownVal = 3;
+  let countdownTimer = null;
+
+  function loop(ts){
+    if(lastTs === null) lastTs = ts;
+    const dt = Math.min(0.05, (ts - lastTs)/1000);
+    lastTs = ts;
+
+    const pads = pollGamepads();
+    const gp1 = pads[0] || null;
+    const gp2 = pads[1] || null;
+
+    if(state === 'playing'){
+      updatePlayerMovement(P1, dt, readStick(gp1,0,1), 'KeyW','KeyS','KeyA','KeyD');
+      updatePlayerMovement(P2, dt, readStick(gp2,0,1), 'ArrowUp','ArrowDown','ArrowLeft','ArrowRight');
+
+      if(anyButtonPressed(gp1) || keys['Space']) tryCatch(P1, 'P1');
+      if(anyButtonPressed(gp2) || keys['Enter']) tryCatch(P2, 'P2');
+
+      updateFish(dt);
+
+      timeLeft -= dt;
+      if(timeLeft <= 0){
+        timeLeft = 0;
+        endGame();
+      }
+      updateTimerUI();
+    }
+
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function updateTimerUI(){
+    document.getElementById('timerNum').textContent = Math.ceil(timeLeft);
+    document.getElementById('timerBarFill').style.width = (timeLeft/GAME_SECONDS*100) + '%';
+  }
+
+  function startCountdown(){
+    document.getElementById('titleScreen').classList.add('hidden');
+    document.getElementById('countdownScreen').classList.remove('hidden');
+    countdownVal = 3;
+    document.getElementById('countdownNum').textContent = countdownVal;
+    state = 'countdown';
+    countdownTimer = setInterval(()=>{
+      countdownVal--;
+      if(countdownVal <= 0){
+        clearInterval(countdownTimer);
+        document.getElementById('countdownScreen').classList.add('hidden');
+        startPlaying();
+      } else {
+        document.getElementById('countdownNum').textContent = countdownVal === 0 ? 'GO!' : countdownVal;
+      }
+    }, 700);
+  }
+
+  function startPlaying(){
+    resetPlayer(P1); resetPlayer(P2);
+    P1.x = canvas.width*0.3; P1.y = canvas.height*0.5;
+    P2.x = canvas.width*0.7; P2.y = canvas.height*0.5;
+    fishes = [];
+    for(let i=0;i<MAX_FISH;i++) spawnFish();
+    timeLeft = GAME_SECONDS;
+    updateHud();
+    updateTimerUI();
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('timerWrap').classList.remove('hidden');
+    state = 'playing';
+  }
+
+  function endGame(){
+    state = 'result';
+    document.getElementById('hud').classList.add('hidden');
+    document.getElementById('timerWrap').classList.add('hidden');
+    document.getElementById('finalScore1').textContent = P1.score;
+    document.getElementById('finalScore2').textContent = P2.score;
+    let winnerText = '';
+    if(P1.score > P2.score) winnerText = '🔵 PLAYER 1 の勝ち！';
+    else if(P2.score > P1.score) winnerText = '🔴 PLAYER 2 の勝ち！';
+    else winnerText = '🤝 引き分け！';
+    document.getElementById('resultWinner').textContent = winnerText;
+    document.getElementById('resultWinner').classList.add('winner');
+    document.getElementById('resultScreen').classList.remove('hidden');
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startCountdown);
+  document.getElementById('retryBtn').addEventListener('click', () => {
+    document.getElementById('resultScreen').classList.add('hidden');
+    startCountdown();
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
