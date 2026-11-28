@@ -101,6 +101,16 @@
     color:rgba(255,255,255,.4);
   }
   .letters span.got{ background:var(--gold); color:#5c3d00; }
+  .status{
+    margin-top:4px; font-size:12px; font-weight:700; opacity:.9;
+    min-height:1.4em;
+  }
+  .chargeBarBg{
+    width:100%; height:6px; background:rgba(0,0,0,.3); border-radius:4px;
+    overflow:hidden; margin-top:3px; display:none;
+  }
+  .chargeBarBg.show{ display:block; }
+  .chargeBarFill{ height:100%; width:0%; background:var(--gold); }
   #timerWrap{
     position:absolute; top:14px; left:50%; transform:translateX(-50%);
     text-align:center; z-index:5; pointer-events:none;
@@ -137,6 +147,8 @@
         <div class="label">PLAYER 1</div>
         <div class="num" id="score1">0</div>
         <div class="letters" id="letters1"></div>
+        <div class="status" id="status1"></div>
+        <div class="chargeBarBg" id="chargeBarWrap1"><div class="chargeBarFill" id="chargeBar1"></div></div>
       </div>
     </div>
     <div class="score-box p2">
@@ -144,6 +156,8 @@
         <div class="label">PLAYER 2</div>
         <div class="num" id="score2">0</div>
         <div class="letters" id="letters2"></div>
+        <div class="status" id="status2"></div>
+        <div class="chargeBarBg" id="chargeBarWrap2"><div class="chargeBarFill" id="chargeBar2"></div></div>
       </div>
     </div>
   </div>
@@ -157,17 +171,18 @@
 
   <div class="overlay" id="titleScreen">
     <h1>🐱 おさかにゃ釣りバトル！ 🐟</h1>
-    <p>ふたりで同時に釣り竿をあやつって、たくさん釣ろう！<br>
+    <p>①左右でねらう場所を決める　②ボタンをためてはなすと投げる！<br>
+    ③もう一度ボタン長押しでリールを巻く　④魚に当たったらそのまま手前まで巻いてゲット！<br>
     自分の文字が「<b>おさかにゃ</b>」ぜんぶ揃うと、ボーナス15点！</p>
     <div class="players-howto">
       <div class="how-card p1">
         <b style="color:var(--p1)">PLAYER 1</b><br>
-        コントローラー：左スティックで移動／いずれかのボタンでキャッチ<br>
-        <small class="note">キーボード：WASD + スペース</small>
+        コントローラー：左スティックの左右でねらう／ボタンでため→投げる→リール<br>
+        <small class="note">キーボード：A/D + スペース</small>
       </div>
       <div class="how-card p2">
         <b style="color:var(--p2)">PLAYER 2</b><br>
-        コントローラー：左スティックで移動／いずれかのボタンでキャッチ<br>
+        コントローラー：左スティックの左右でねらう／ボタンでため→投げる→リール<br>
         <small class="note">キーボード：矢印キー + Enter</small>
       </div>
     </div>
@@ -232,28 +247,68 @@
   WORD.forEach(ch => { for(let i=0;i<6;i++) LETTER_POOL.push(ch); });
 
   const GAME_SECONDS = 60;
-  const CATCH_RADIUS = 46;
   const MAX_FISH = 9;
 
+  // Depth model: 0 = right at the player (near shore), 1 = out at the
+  // horizon (far). x is also normalized 0..1 across the pond's width.
+  const MIN_CAST_DEPTH = 0.18;
+  const MAX_CAST_DEPTH = 1.0;
+  const CHARGE_TIME = 1.1;      // seconds of holding to reach full power
+  const REEL_SPEED = 0.45;      // depth/sec while reeling
+  const HOOK_X_TOL = 0.085;
+  const HOOK_DEPTH_TOL = 0.07;
+  const FISH_MIN_DEPTH = 0.28;
+  const FISH_MAX_DEPTH = 1.0;
+
+  function chargeToDepth(charge){
+    return MIN_CAST_DEPTH + charge * (MAX_CAST_DEPTH - MIN_CAST_DEPTH);
+  }
+
+  // ---------- perspective projection ----------
+  // Maps normalized (xNorm 0..1, depth 0..1) to screen (x, y, scale),
+  // giving the pond a sense of depth: far = small & near the horizon,
+  // close = big & near the bottom (the player's side).
+  function project(xNorm, depth){
+    const t = Math.max(0, Math.min(1, depth));
+    const farY = canvas.height * 0.20;
+    const nearY = canvas.height * 0.93;
+    const farHalfW = canvas.width * 0.13;
+    const nearHalfW = canvas.width * 0.48;
+    const y = nearY + (farY - nearY) * t;
+    const halfW = nearHalfW + (farHalfW - nearHalfW) * t;
+    const cx = canvas.width / 2;
+    const x = cx + (xNorm - 0.5) * 2 * halfW;
+    const scale = 1.3 - t * 0.95;
+    return {x, y, scale};
+  }
+
   // ---------- players ----------
-  function newPlayer(color){
+  function newPlayer(color, standX){
     return {
       color: color,
-      x: 0, y: 0,
+      standX: standX,   // fixed position the angler stands at (near edge)
+      aimX: standX,      // where the line is currently aimed (0..1)
+      depth: 0,          // 0 = reeled all the way in
+      state: 'aim',      // 'aim' | 'out' | 'reeling'
+      isCharging: false,
+      charge: 0,
+      hookedFish: null,
+      prevHeld: false,
       score: 0,
-      got: {}, // letter -> true
-      catchCooldown: 0,
+      got: {},           // letter -> true
       pulse: 0
     };
   }
-  const P1 = newPlayer(getComputedStyleVar('--p1'));
-  const P2 = newPlayer(getComputedStyleVar('--p2'));
   function getComputedStyleVar(name){
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#fff';
   }
+  const P1 = newPlayer(getComputedStyleVar('--p1'), 0.28);
+  const P2 = newPlayer(getComputedStyleVar('--p2'), 0.72);
 
   function resetPlayer(p){
-    p.score = 0; p.got = {}; p.catchCooldown = 0; p.pulse = 0;
+    p.aimX = p.standX; p.depth = 0; p.state = 'aim';
+    p.isCharging = false; p.charge = 0; p.hookedFish = null;
+    p.score = 0; p.got = {}; p.pulse = 0;
   }
 
   // ---------- fish ----------
@@ -262,31 +317,31 @@
   function spawnFish(){
     const type = FISH_FILES[Math.floor(Math.random()*FISH_FILES.length)];
     const letter = LETTER_POOL[Math.floor(Math.random()*LETTER_POOL.length)];
-    const r = 30 + Math.random()*16;
     fishes.push({
       id: fishId++,
       type, letter,
-      x: r + Math.random()*(canvas.width - r*2),
-      y: r + Math.random()*(canvas.height*0.7 - r*2) + canvas.height*0.15,
-      r,
-      vx: (Math.random()*2-1) * 40,
-      vy: (Math.random()*2-1) * 20,
+      x: 0.08 + Math.random()*0.84,
+      depth: FISH_MIN_DEPTH + Math.random()*(FISH_MAX_DEPTH-FISH_MIN_DEPTH),
+      baseSize: 30 + Math.random()*14,
+      vx: (Math.random()*2-1) * 0.05,
+      vd: (Math.random()*2-1) * 0.035,
       bob: Math.random()*Math.PI*2,
-      caught: 0 // scale anim on catch
+      hooked: false,
+      caught: 0 // scale-out anim timer once caught
     });
   }
 
   function updateFish(dt){
     for(const f of fishes){
       if(f.caught > 0){ f.caught += dt*4; continue; }
-      f.bob += dt*2;
+      if(f.hooked) continue; // position is driven by whichever player hooked it
+      f.bob += dt*1.5;
       f.x += f.vx*dt;
-      f.y += f.vy*dt + Math.sin(f.bob)*6*dt;
-      if(f.x < f.r || f.x > canvas.width - f.r) f.vx *= -1;
-      const topBound = canvas.height*0.15, botBound = canvas.height*0.85;
-      if(f.y < topBound || f.y > botBound) f.vy *= -1;
-      f.x = Math.max(f.r, Math.min(canvas.width-f.r, f.x));
-      f.y = Math.max(topBound, Math.min(botBound, f.y));
+      f.depth += f.vd*dt + Math.sin(f.bob)*0.01*dt;
+      if(f.x < 0.05 || f.x > 0.95) f.vx *= -1;
+      if(f.depth < FISH_MIN_DEPTH || f.depth > FISH_MAX_DEPTH) f.vd *= -1;
+      f.x = Math.max(0.05, Math.min(0.95, f.x));
+      f.depth = Math.max(FISH_MIN_DEPTH, Math.min(FISH_MAX_DEPTH, f.depth));
     }
     fishes = fishes.filter(f => f.caught < 1);
     while(fishes.length < MAX_FISH) spawnFish();
@@ -297,13 +352,11 @@
   window.addEventListener('keydown', e => keys[e.code] = true);
   window.addEventListener('keyup', e => keys[e.code] = false);
 
-  function readStick(gp, idxX, idxY){
-    if(!gp) return {x:0,y:0};
-    let x = gp.axes[idxX] || 0;
-    let y = gp.axes[idxY] || 0;
+  function readAxisX(gp){
+    if(!gp) return 0;
+    let x = gp.axes[0] || 0;
     if(Math.abs(x) < 0.15) x = 0;
-    if(Math.abs(y) < 0.15) y = 0;
-    return {x, y};
+    return x;
   }
   function anyButtonPressed(gp){
     if(!gp) return false;
@@ -327,40 +380,67 @@
     gpStatusShown = true;
   });
 
-  const SPEED = 420; // px/sec at full stick
+  const AIM_SPEED = 0.85; // normalized units/sec at full stick
 
-  function updatePlayerMovement(p, dt, stick, kbUp, kbDown, kbLeft, kbRight){
-    let dx = stick.x, dy = stick.y;
-    if(keys[kbLeft]) dx -= 1;
-    if(keys[kbRight]) dx += 1;
-    if(keys[kbUp]) dy -= 1;
-    if(keys[kbDown]) dy += 1;
-    dx = Math.max(-1, Math.min(1, dx));
-    dy = Math.max(-1, Math.min(1, dy));
-    p.x += dx * SPEED * dt;
-    p.y += dy * SPEED * dt;
-    p.x = Math.max(20, Math.min(canvas.width-20, p.x));
-    p.y = Math.max(20, Math.min(canvas.height-20, p.y));
-    if(p.catchCooldown > 0) p.catchCooldown -= dt;
+  // label: 'P1' | 'P2'; statusEl/chargeWrapEl/chargeFillEl: DOM nodes for feedback
+  function updatePlayer(p, dt, axisX, held, label){
     if(p.pulse > 0) p.pulse -= dt*3;
-  }
 
-  function tryCatch(p, label){
-    if(p.catchCooldown > 0) return;
-    let best = null, bestDist = Infinity;
-    for(const f of fishes){
-      if(f.caught > 0) continue;
-      const d = Math.hypot(f.x - p.x, f.y - p.y);
-      if(d < CATCH_RADIUS + f.r*0.5 && d < bestDist){
-        best = f; bestDist = d;
+    if(p.state === 'aim'){
+      let dx = axisX;
+      if(label === 'P1'){ if(keys['KeyA']) dx -= 1; if(keys['KeyD']) dx += 1; }
+      else { if(keys['ArrowLeft']) dx -= 1; if(keys['ArrowRight']) dx += 1; }
+      dx = Math.max(-1, Math.min(1, dx));
+      p.aimX = Math.max(0.04, Math.min(0.96, p.aimX + dx*AIM_SPEED*dt));
+
+      if(held && !p.prevHeld){ p.isCharging = true; p.charge = 0; }
+      if(p.isCharging){
+        if(held){
+          p.charge = Math.min(1, p.charge + dt/CHARGE_TIME);
+        } else {
+          // released: cast!
+          p.depth = chargeToDepth(p.charge);
+          p.state = 'out';
+          p.isCharging = false;
+          p.charge = 0;
+        }
+      }
+    } else if(p.state === 'out'){
+      if(held && !p.prevHeld){ p.state = 'reeling'; }
+    } else if(p.state === 'reeling'){
+      if(held){
+        // look for a fish to hook before moving, so it can be hooked right
+        // up to the moment it would've been reeled past
+        if(!p.hookedFish){
+          let best = null, bestD = Infinity;
+          for(const f of fishes){
+            if(f.hooked || f.caught > 0) continue;
+            const dxp = Math.abs(f.x - p.aimX), ddp = Math.abs(f.depth - p.depth);
+            if(dxp < HOOK_X_TOL && ddp < HOOK_DEPTH_TOL){
+              const d = dxp + ddp;
+              if(d < bestD){ bestD = d; best = f; }
+            }
+          }
+          if(best){ best.hooked = true; p.hookedFish = best; p.pulse = 1; }
+        }
+        p.depth = Math.max(0, p.depth - REEL_SPEED*dt);
+        if(p.hookedFish){ p.hookedFish.x = p.aimX; p.hookedFish.depth = p.depth; }
+        if(p.depth <= 0){
+          finishReel(p, label);
+        }
+      } else {
+        p.state = 'out'; // paused, resume reeling on next press
       }
     }
-    if(best){
-      best.caught = 0.01;
+    p.prevHeld = held;
+  }
+
+  function finishReel(p, label){
+    if(p.hookedFish){
+      const f = p.hookedFish;
+      f.caught = 0.01;
       p.score += 3;
-      p.catchCooldown = 0.35;
-      p.pulse = 1;
-      if(WORD.includes(best.letter)) p.got[best.letter] = true;
+      if(WORD.includes(f.letter)) p.got[f.letter] = true;
       const complete = WORD.every(ch => p.got[ch]);
       if(complete){
         p.score += 15;
@@ -369,6 +449,9 @@
       }
       updateHud();
     }
+    p.state = 'aim';
+    p.depth = 0;
+    p.hookedFish = null;
   }
 
   function showToast(text, who){
@@ -399,99 +482,159 @@
       el.appendChild(s);
     });
   }
+  const STATE_LABEL = {
+    aim: 'ねらいを決めてボタン長押し',
+    out: 'もう一度ボタンでリール！',
+    reeling: 'リール中…はなすと一時停止'
+  };
+  function updateStatusUI(p, statusEl, wrapEl, fillEl){
+    statusEl.textContent = p.isCharging ? 'ためています…' : STATE_LABEL[p.state];
+    if(p.isCharging){
+      wrapEl.classList.add('show');
+      fillEl.style.width = (p.charge*100) + '%';
+    } else {
+      wrapEl.classList.remove('show');
+    }
+  }
 
   // ---------- render ----------
   function draw(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawPond();
 
-    // sea floor decoration band
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.fillRect(0, canvas.height*0.85, canvas.width, canvas.height*0.15);
+    // sort fish+players by depth (far first) so near things draw on top
+    const drawables = fishes.map(f => ({type:'fish', depth:f.depth, f}))
+      .concat([{type:'player', depth:P1.depth, p:P1, label:'P1'},
+               {type:'player', depth:P2.depth, p:P2, label:'P2'}]);
+    drawables.sort((a,b) => b.depth - a.depth);
 
-    // fish
-    for(const f of fishes){
-      ctx.save();
-      const scale = f.caught > 0 ? Math.max(0, 1 - f.caught) : 1;
-      ctx.translate(f.x, f.y);
-      ctx.scale(scale * (f.vx < 0 ? -1 : 1), scale);
-      const img = FISH_SRC[f.type];
-      const size = f.r*2.4;
-      if(img.complete && img.naturalWidth){
-        ctx.drawImage(img, -size/2, -size/2, size, size);
-      } else {
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(0,0,f.r,0,Math.PI*2); ctx.fill();
-      }
-      ctx.restore();
-
-      if(f.caught <= 0){
-        // letter badge
-        ctx.save();
-        ctx.translate(f.x, f.y - f.r - 10);
-        ctx.beginPath();
-        ctx.arc(0,0,14,0,Math.PI*2);
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.fill();
-        ctx.fillStyle = '#5c3d00';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(f.letter, 0, 1);
-        ctx.restore();
-      }
+    for(const d of drawables){
+      if(d.type === 'fish') drawFish(d.f);
+      else drawLine(d.p);
     }
-
-    // cursors
-    drawCursor(P1);
-    drawCursor(P2);
+    for(const d of drawables){
+      if(d.type === 'player') drawRig(d.p);
+    }
   }
 
-  // Drawn as plain vector shapes rather than an emoji glyph: canvas text
+  function drawPond(){
+    // a few depth guide-lines (ripples), closer together toward the horizon
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 2;
+    [0.15,0.35,0.55,0.75,1.0].forEach(t=>{
+      const l = project(0, t), r = project(1, t);
+      ctx.beginPath();
+      ctx.moveTo(l.x, l.y);
+      ctx.lineTo(r.x, r.y);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function drawFish(f){
+    const proj = project(f.x, f.depth);
+    ctx.save();
+    const shrink = f.caught > 0 ? Math.max(0, 1 - f.caught) : 1;
+    ctx.translate(proj.x, proj.y);
+    ctx.scale(proj.scale * shrink * (f.vx < 0 ? -1 : 1), proj.scale * shrink);
+    const img = FISH_SRC[f.type];
+    const size = f.baseSize*2.4;
+    if(img.complete && img.naturalWidth){
+      ctx.drawImage(img, -size/2, -size/2, size, size);
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(0,0,f.baseSize,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+
+    if(f.caught <= 0){
+      ctx.save();
+      ctx.translate(proj.x, proj.y - f.baseSize*proj.scale - 10);
+      const badgeR = Math.max(10, 14*proj.scale);
+      ctx.beginPath();
+      ctx.arc(0,0,badgeR,0,Math.PI*2);
+      ctx.fillStyle = f.hooked ? 'rgba(255,214,59,0.95)' : 'rgba(255,255,255,0.92)';
+      ctx.fill();
+      ctx.fillStyle = '#5c3d00';
+      ctx.font = 'bold ' + Math.max(11, Math.round(16*proj.scale)) + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(f.letter, 0, 1);
+      ctx.restore();
+    }
+  }
+
+  // line from the angler's stand point to the current lure position
+  function drawLine(p){
+    const from = project(p.standX, 0);
+    const lureDepth = p.state === 'aim' ? (p.isCharging ? chargeToDepth(p.charge) : 0) : p.depth;
+    const to = project(p.aimX, lureDepth);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y - 14);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Drawn as plain vector shapes rather than emoji glyphs: canvas text
   // rendering of emoji is unreliable across browsers/OSes (can render as a
   // faint fallback glyph), which matters since this runs on a signage PC
   // we don't control the font setup of.
-  function drawCursor(p){
+  function drawRig(p){
+    // angler's stand icon at the near edge
+    const stand = project(p.standX, 0);
     ctx.save();
-    ctx.translate(p.x, p.y);
-    const pulse = 1 + p.pulse*0.5;
-
-    // outer catch-radius ring
+    ctx.translate(stand.x, stand.y);
     ctx.beginPath();
-    ctx.arc(0,0, CATCH_RADIUS*0.55*pulse, 0, Math.PI*2);
-    ctx.strokeStyle = p.color;
-    ctx.lineWidth = 4;
-    ctx.globalAlpha = 0.85;
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // fishing line down to a hook
-    ctx.beginPath();
-    ctx.moveTo(0, -30);
-    ctx.lineTo(0, 6);
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(0, 14, 9, Math.PI*0.15, Math.PI*1.1);
-    ctx.strokeStyle = '#eee';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    // player-colored bob/handle
-    ctx.beginPath();
-    ctx.arc(0,0, 13, 0, Math.PI*2);
+    ctx.arc(0,0,16,0,Math.PI*2);
     ctx.fillStyle = p.color;
+    ctx.globalAlpha = 0.9;
     ctx.fill();
+    ctx.globalAlpha = 1;
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#fff';
     ctx.stroke();
+    ctx.restore();
 
+    // lure / hook marker
+    const lureDepth = p.state === 'aim' ? (p.isCharging ? chargeToDepth(p.charge) : 0) : p.depth;
+    const proj = project(p.aimX, lureDepth);
+    const pulse = 1 + p.pulse*0.6;
+    ctx.save();
+    ctx.translate(proj.x, proj.y);
+
+    if(p.state === 'reeling'){
+      ctx.beginPath();
+      ctx.arc(0,0, 14*proj.scale*pulse, 0, Math.PI*2);
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.85;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.beginPath();
+    ctx.arc(0,0, Math.max(5, 9*proj.scale), 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
     ctx.restore();
   }
 
   // ---------- game loop / state ----------
+  const statusEl1 = document.getElementById('status1');
+  const statusEl2 = document.getElementById('status2');
+  const chargeWrap1 = document.getElementById('chargeBarWrap1');
+  const chargeWrap2 = document.getElementById('chargeBarWrap2');
+  const chargeFill1 = document.getElementById('chargeBar1');
+  const chargeFill2 = document.getElementById('chargeBar2');
+
   let state = 'title'; // title -> countdown -> playing -> result
   let timeLeft = GAME_SECONDS;
   let lastTs = null;
@@ -508,11 +651,12 @@
     const gp2 = pads[1] || null;
 
     if(state === 'playing'){
-      updatePlayerMovement(P1, dt, readStick(gp1,0,1), 'KeyW','KeyS','KeyA','KeyD');
-      updatePlayerMovement(P2, dt, readStick(gp2,0,1), 'ArrowUp','ArrowDown','ArrowLeft','ArrowRight');
-
-      if(anyButtonPressed(gp1) || keys['Space']) tryCatch(P1, 'P1');
-      if(anyButtonPressed(gp2) || keys['Enter']) tryCatch(P2, 'P2');
+      const held1 = anyButtonPressed(gp1) || keys['Space'];
+      const held2 = anyButtonPressed(gp2) || keys['Enter'];
+      updatePlayer(P1, dt, readAxisX(gp1), held1, 'P1');
+      updatePlayer(P2, dt, readAxisX(gp2), held2, 'P2');
+      updateStatusUI(P1, statusEl1, chargeWrap1, chargeFill1);
+      updateStatusUI(P2, statusEl2, chargeWrap2, chargeFill2);
 
       updateFish(dt);
 
@@ -553,8 +697,6 @@
 
   function startPlaying(){
     resetPlayer(P1); resetPlayer(P2);
-    P1.x = canvas.width*0.3; P1.y = canvas.height*0.5;
-    P2.x = canvas.width*0.7; P2.y = canvas.height*0.5;
     fishes = [];
     for(let i=0;i<MAX_FISH;i++) spawnFish();
     timeLeft = GAME_SECONDS;
