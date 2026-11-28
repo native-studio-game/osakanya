@@ -437,14 +437,20 @@
     }
 
     // cursors
-    drawCursor(P1, '🔵');
-    drawCursor(P2, '🔴');
+    drawCursor(P1);
+    drawCursor(P2);
   }
 
-  function drawCursor(p, emoji){
+  // Drawn as plain vector shapes rather than an emoji glyph: canvas text
+  // rendering of emoji is unreliable across browsers/OSes (can render as a
+  // faint fallback glyph), which matters since this runs on a signage PC
+  // we don't control the font setup of.
+  function drawCursor(p){
     ctx.save();
     ctx.translate(p.x, p.y);
     const pulse = 1 + p.pulse*0.5;
+
+    // outer catch-radius ring
     ctx.beginPath();
     ctx.arc(0,0, CATCH_RADIUS*0.55*pulse, 0, Math.PI*2);
     ctx.strokeStyle = p.color;
@@ -452,10 +458,31 @@
     ctx.globalAlpha = 0.85;
     ctx.stroke();
     ctx.globalAlpha = 1;
-    ctx.font = '30px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🎣', 0, 0);
+
+    // fishing line down to a hook
+    ctx.beginPath();
+    ctx.moveTo(0, -30);
+    ctx.lineTo(0, 6);
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(0, 14, 9, Math.PI*0.15, Math.PI*1.1);
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // player-colored bob/handle
+    ctx.beginPath();
+    ctx.arc(0,0, 13, 0, Math.PI*2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#fff';
+    ctx.stroke();
+
     ctx.restore();
   }
 
